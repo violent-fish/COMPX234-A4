@@ -1,0 +1,55 @@
+import socket
+import sys
+import base64
+
+def download_file( ):
+    server_address = (server_ip, server_port)
+    download_message = f"DOWNLOAD {file_name}".encode()
+    client_socket.sendto(download_message, server_address)
+    print(f"Requested {file_name} from {server_ip}:{server_port}")
+
+    try:
+        response, _ = client_socket.recvfrom(1024)
+        response_message = response.decode().strip()
+        print(f"Received response: {response_message}")
+
+        if response_message.startswith("OK"):
+            file_size = int(response_message.split()[1])
+            print(f"File size: {file_size} bytes")
+            with open(file_name, 'wb') as file:
+                while True:
+                    try:
+                        chunk_response, _ = client_socket.recvfrom(1024)
+                        encoded_chunk = chunk_response.decode().strip()
+                        chunk_data = base64.b64decode(encoded_chunk)
+                        file.write(chunk_data)
+                        print("*", end="", flush=True)
+                    except socket.timeout:
+                        print("Timeout waiting for chunk, retrying...")
+                        continue
+
+                    if file.tell() >= file_size:
+                        break
+            print("\nFile download complete.")
+        else:
+            print(f"Error: {response_message}")
+    except socket.timeout:
+        print("Timeout waiting for initial response.")
+
+def main():
+    if len(sys.argv) < 4:
+        print("Usage: python client.py <serverIP> <serverPort> <fileList>")
+        return
+
+    server_ip = sys.argv[1]
+    server_port = int(sys.argv[2])
+    file_list_path = sys.argv[3]
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client_socket:
+        with open(file_list_path, 'r') as file:
+            for line in file:
+                file_name = line.strip()
+                download_file( )
+
+if __name__ == "__main__":
+    main()
