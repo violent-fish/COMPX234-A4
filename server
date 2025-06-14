@@ -1,0 +1,54 @@
+import socket
+import os
+import base64
+
+def main():
+    host = '0.0.0.0'  # 监听所有网络接口
+    port = 51234
+
+    # 创建套接字
+    s = socket.socket( )
+    s.bind((host, port))
+
+    print(f"Server listening on {host}:{port}")
+
+    while True:
+        data, addr = s.recvfrom(1024)
+        request = data.decode().strip()
+        print(f"Received request from {addr}: {request}")
+        base_path = "D:\\COMPX216"
+        if request.startswith("DOWNLOAD"):
+            parts = request.split()
+            if len(parts) < 2:
+                response = "ERROR Invalid request"
+            else:
+                filename = parts[1]
+                filepath = os.path.join("files", filename)
+                if os.path.exists(filepath):
+                    with open(filepath, "rb") as file:
+                        file_size = os.path.getsize(filepath)
+                        response = f"OK {file_size}"
+                else:
+                    response = "ERROR File not found"
+
+            s.sendto(response.encode(), addr)
+            print(f"Sent response: {response}")
+
+            if response.startswith("OK"):
+                file_size = int(response.split()[1])
+                with open(filepath, "rb") as file:
+                    chunk_size = 1024  # 每次发送1024字节
+                    for start in range(0, file_size, chunk_size):
+                        end = min(start + chunk_size, file_size)
+                        chunk = file.read(end - start)
+                        encoded_chunk = base64.b64encode(chunk).decode()
+                        s.sendto(encoded_chunk.encode(), addr)
+                        print("*", end="", flush=True)
+                print("\nFile transfer complete.")
+        else:
+            response = "ERROR Invalid request"
+            s.sendto(response.encode(), addr)
+            print(f"Sent response: {response}")
+
+if __name__ == "__main__":
+    main()
